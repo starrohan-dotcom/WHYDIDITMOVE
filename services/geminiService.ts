@@ -5,6 +5,12 @@ import { StockExplanation, MarketStatus, UserProfile, DiscoveryResult, Portfolio
 const getAiClient = () => new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
 
 const cleanJson = (text: string) => {
+  // Try to find a JSON object or array
+  const match = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (match) {
+    return match[0];
+  }
+  // Fallback to basic cleanup if no clear JSON structure found
   return text.trim().replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
 };
 
@@ -73,7 +79,10 @@ const generateWithFallback = async (generateFn: (model: string) => Promise<any>)
 const getSmartConfig = (model: string, schema: any, systemInstruction: string) => {
   const isLite = model.includes('lite');
   const baseConfig: any = {
-    systemInstruction: systemInstruction,
+    // If Lite, we MUST enforce JSON in the instructions since we can't use responseMimeType
+    systemInstruction: isLite
+      ? systemInstruction + "\n\nCRITICAL: Output strictly valid JSON only. Do not wrap in markdown. Do not include any text before or after."
+      : systemInstruction,
     tools: [{ googleSearch: {} }]
   };
 
