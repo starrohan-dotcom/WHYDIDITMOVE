@@ -1,0 +1,7 @@
+{
+  "name": "WhyDidItMove",
+  "description": "A beginner-friendly tool to understand why Indian stocks moved today, using simple language and objective market data.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
