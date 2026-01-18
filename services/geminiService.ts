@@ -205,7 +205,36 @@ export const fetchStockExplanation = async (stockName: string): Promise<StockExp
     });
 
     const jsonStr = cleanJson(response.text);
-    const data = JSON.parse(jsonStr);
+    let data;
+    try {
+      data = JSON.parse(jsonStr);
+    } catch (e) {
+      console.error("JSON Parse Error:", e);
+      throw new Error("Failed to parse API response");
+    }
+
+    // Default structure to prevent "Cannot read properties of undefined"
+    const safeData = {
+      stockName: data.stockName || stockName,
+      priceChange: data.priceChange || "0%",
+      direction: data.direction || "neutral",
+      oneLineSummary: data.oneLineSummary || "Data unavailable",
+      historicalPrices: Array.isArray(data.historicalPrices) ? data.historicalPrices : [],
+      cards: {
+        marketContext: data.cards?.marketContext || "N/A",
+        sectorPerformance: data.cards?.sectorPerformance || "N/A",
+        newsImpact: {
+          text: data.cards?.newsImpact?.text || "No news found",
+          impact: data.cards?.newsImpact?.impact || "None",
+          sentiment: data.cards?.newsImpact?.sentiment || "Neutral",
+          url: data.cards?.newsImpact?.url || ""
+        },
+        tradingActivity: data.cards?.tradingActivity || "N/A",
+        historicalPattern: data.cards?.historicalPattern || "N/A"
+      },
+      premiumInsight: data.premiumInsight || "Analysis unavailable",
+      finalTakeaway: data.finalTakeaway || "Please retry."
+    };
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const sources = groundingChunks
@@ -215,7 +244,7 @@ export const fetchStockExplanation = async (stockName: string): Promise<StockExp
         uri: chunk.web.uri
       }));
 
-    return { ...data, sources };
+    return { ...safeData, sources };
   });
 };
 
