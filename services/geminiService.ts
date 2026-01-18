@@ -39,6 +39,9 @@ STRICT RULES:
 - Context: Indian market (NSE/BSE).`;
 
 const MODELS = [
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash-lite-preview-09-2025',
+  'gemini-2.0-flash-lite-preview-02-05',
   'gemini-2.0-flash',
   'gemini-flash-latest',
   'gemini-pro-latest',
