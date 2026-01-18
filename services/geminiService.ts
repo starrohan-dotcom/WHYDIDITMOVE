@@ -39,11 +39,14 @@ STRICT RULES:
 - Context: Indian market (NSE/BSE).`;
 
 const MODELS = [
+  'gemini-2.0-flash',
   'gemini-flash-latest',
   'gemini-pro-latest',
   'gemini-exp-1206',
   'gemini-3-flash-preview',
-  'gemini-3-pro-preview'
+  'gemini-3-pro-preview',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro'
 ];
 
 const generateWithFallback = async (generateFn: (model: string) => Promise<any>): Promise<any> => {

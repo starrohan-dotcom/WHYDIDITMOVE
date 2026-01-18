@@ -198,9 +198,14 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error("Explanation Error:", err);
       let msg = err.message || "Unknown Error";
-      if (msg.includes("429") || msg.includes("Quota")) {
+
+      // If it's the "All models failed" error, preserve the details but format it nicely
+      if (msg.includes("All models failed")) {
+        // Keep the full message so the user can see which specific models failed
+      } else if (msg.includes("429") || msg.includes("Quota")) {
         msg = "Daily API Quota Exceeded. Please wait a minute or try again tomorrow.";
       }
+
       setState(prev => ({ ...prev, loading: false, error: `Audit Failed: ${msg}` }));
     }
   };
