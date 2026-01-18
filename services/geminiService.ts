@@ -70,6 +70,21 @@ const generateWithFallback = async (generateFn: (model: string) => Promise<any>)
   throw new Error(`All models failed. Details:\n${errors.join('\n')}`);
 };
 
+const getSmartConfig = (model: string, schema: any, systemInstruction: string) => {
+  const isLite = model.includes('lite');
+  const baseConfig: any = {
+    systemInstruction: systemInstruction,
+    tools: [{ googleSearch: {} }]
+  };
+
+  if (!isLite) {
+    baseConfig.responseMimeType = "application/json";
+    baseConfig.responseSchema = schema;
+  }
+
+  return baseConfig;
+};
+
 export const checkMarketStatus = async (dateStr: string): Promise<MarketStatus> => {
   const cachedStatus = sessionStorage.getItem(CACHE_KEY);
   const cachedTime = sessionStorage.getItem(CACHE_TIME_KEY);
@@ -121,35 +136,7 @@ export const fetchYesterdayPulse = async (): Promise<YesterdayPulse> => {
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
-      config: {
-        systemInstruction: EXPLAINER_SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            nifty: {
-              type: Type.OBJECT,
-              properties: {
-                change: { type: Type.STRING },
-                direction: { type: Type.STRING, enum: ['up', 'down', 'neutral'] }
-              },
-              required: ['change', 'direction']
-            },
-            sensex: {
-              type: Type.OBJECT,
-              properties: {
-                change: { type: Type.STRING },
-                direction: { type: Type.STRING, enum: ['up', 'down', 'neutral'] }
-              },
-              required: ['change', 'direction']
-            },
-            topSector: { type: Type.STRING },
-            topStory: { type: Type.STRING }
-          },
-          required: ['nifty', 'sensex', 'topSector', 'topStory']
-        }
-      }
+      config: getSmartConfig(model, schema, EXPLAINER_SYSTEM_INSTRUCTION)
     });
     return JSON.parse(cleanJson(response.text));
   });
@@ -205,12 +192,7 @@ export const fetchStockExplanation = async (stockName: string): Promise<StockExp
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
-      config: {
-        systemInstruction: EXPLAINER_SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: stockExplanationSchema as any
-      },
+      config: getSmartConfig(model, stockExplanationSchema, EXPLAINER_SYSTEM_INSTRUCTION)
     });
 
     const jsonStr = cleanJson(response.text);
@@ -234,24 +216,21 @@ export const fetchComparison = async (stockA: string, stockB: string): Promise<C
   Explain why each moved recently and how their performance compares.
   Return JSON matching the comparison schema.`;
 
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      stockA: stockExplanationSchema,
+      stockB: stockExplanationSchema,
+      comparisonSummary: { type: Type.STRING, description: "A summary of how these two stocks differ in their recent movement drivers." }
+    },
+    required: ['stockA', 'stockB', 'comparisonSummary']
+  };
+
   return await generateWithFallback(async (model) => {
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
-      config: {
-        systemInstruction: EXPLAINER_SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            stockA: stockExplanationSchema,
-            stockB: stockExplanationSchema,
-            comparisonSummary: { type: Type.STRING, description: "A summary of how these two stocks differ in their recent movement drivers." }
-          },
-          required: ['stockA', 'stockB', 'comparisonSummary']
-        } as any
-      }
+      config: getSmartConfig(model, schema, EXPLAINER_SYSTEM_INSTRUCTION)
     });
 
     const data = JSON.parse(cleanJson(response.text));
@@ -269,38 +248,35 @@ export const fetchDiscoverySuggestions = async (profile: UserProfile): Promise<D
   const prompt = `Educational study for: Risk=${profile.riskTolerance}, Horizon=${profile.horizon}.
   Suggest 2-3 NSE/BSE stocks for learning/study. Focus on capital protection and diversification principles. NO ADVICE.`;
 
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      profileAnalysis: { type: Type.STRING },
+      suggestedStocks: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            ticker: { type: Type.STRING },
+            reasoning: { type: Type.STRING },
+            fundamentals: { type: Type.STRING },
+            newsImpact: { type: Type.STRING },
+            risks: { type: Type.STRING },
+            learningFocus: { type: Type.STRING }
+          },
+          required: ['name', 'ticker', 'reasoning', 'fundamentals', 'newsImpact', 'risks', 'learningFocus']
+        }
+      }
+    },
+    required: ['profileAnalysis', 'suggestedStocks']
+  };
+
   return await generateWithFallback(async (model) => {
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
-      config: {
-        systemInstruction: REBALANCER_SYSTEM_INSTRUCTION,
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            profileAnalysis: { type: Type.STRING },
-            suggestedStocks: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  ticker: { type: Type.STRING },
-                  reasoning: { type: Type.STRING },
-                  fundamentals: { type: Type.STRING },
-                  newsImpact: { type: Type.STRING },
-                  risks: { type: Type.STRING },
-                  learningFocus: { type: Type.STRING }
-                },
-                required: ['name', 'ticker', 'reasoning', 'fundamentals', 'newsImpact', 'risks', 'learningFocus']
-              }
-            }
-          },
-          required: ['profileAnalysis', 'suggestedStocks']
-        }
-      }
+      config: getSmartConfig(model, schema, REBALANCER_SYSTEM_INSTRUCTION)
     });
     return JSON.parse(cleanJson(response.text));
   });
@@ -315,34 +291,32 @@ export const fetchRebalancingSuggestions = async (
   Holdings: ${JSON.stringify(holdings)}.
   Provide logical diversification study. NO ADVICE.`;
 
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      analysis: { type: Type.STRING },
+      diversificationScore: { type: Type.NUMBER },
+      suggestions: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            description: { type: Type.STRING },
+            type: { type: Type.STRING, enum: ['Risk', 'Opportunity', 'Balance'] }
+          },
+          required: ['title', 'description', 'type']
+        }
+      }
+    },
+    required: ['analysis', 'diversificationScore', 'suggestions']
+  };
+
   return await generateWithFallback(async (model) => {
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,
-      config: {
-        systemInstruction: REBALANCER_SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            analysis: { type: Type.STRING },
-            diversificationScore: { type: Type.NUMBER },
-            suggestions: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  type: { type: Type.STRING, enum: ['Risk', 'Opportunity', 'Balance'] }
-                },
-                required: ['title', 'description', 'type']
-              }
-            }
-          },
-          required: ['analysis', 'diversificationScore', 'suggestions']
-        }
-      }
+      config: getSmartConfig(model, schema, REBALANCER_SYSTEM_INSTRUCTION)
     });
 
     return JSON.parse(cleanJson(response.text));
